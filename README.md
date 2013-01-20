@@ -71,7 +71,7 @@ new Job({
 ```
 
 In this example, ctask will execute one task per second up to 4 concurrent tasks 
-(depends on number of workers spawned). Each task whill end after 5 seconds and its
+(depends on number of workers spawned). Each task will end after 5 seconds and its
 worker will be released to perform a new task.
 
 Number of concurrent tasks is alway equal to number of spawned workers. You can spawn
