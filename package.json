@@ -1,7 +1,7 @@
 {
   "name": "ctask",
   "description": "Cluster task scheduler for nodejs",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "author": {
     "name": "Patrik Simek",
     "email": "patrik@patriksimek.cz"
@@ -12,7 +12,7 @@
   "keywords": [
     "cluster",
     "task",
-    "scheduler",
+    "schedule",
     "job"
   ],
   "repository": {
@@ -21,6 +21,6 @@
   },
   "main": "lib/index.js",
   "engines": {
-    "node": "*"
+    "node": "0.8.0"
   }
 }
