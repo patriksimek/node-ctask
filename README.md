@@ -32,12 +32,18 @@ new Job({
 
 * name - Name of the task, must be unique for each task
 * interval - Repeat interval in ms
-* shared - Use workers for task processing
+* shared - Use concurrent workers for task processing
 * multi - Can run multiple instances of tasks simultaneously?
 * context - Context of target function
 * locking - Described bellow
 * report - Verbose mode for debugging
 * action - The function that will be executed
+
+Number of concurrent tasks is always equal to number of spawned workers. You can spawn
+and destroy workers as you wish. If you destroy all workers, the task with "shared" enabled will
+not run.
+
+If you set "shared" to false, the task will be executed only in master process.
 
 ### Locking
 
@@ -73,12 +79,6 @@ new Job({
 In this example, ctask will execute one task per second up to 4 concurrent tasks 
 (depend on number of workers spawned). Each task will end after 5 seconds and its
 worker will be released to perform a new task.
-
-Number of concurrent tasks is always equal to number of spawned workers. You can spawn
-and destroy workers as you wish. If you destroy all workers, the task with shared mode will
-not run.
-
-You can use ctask in single threaded environment with disabled task sharing.
 
 ### Controling tasks
 
