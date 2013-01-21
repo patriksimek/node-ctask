@@ -1,113 +1,21 @@
 cluster = require 'cluster'
+EventEmitter = require('events').EventEmitter
 
-trace = console.log
-
-Scheduler =
+class Scheduler extends EventEmitter
 	jobs: {}
 	workers: []
 	employed: {}
 	timers: {}
 	locked: false
 	
-	attach: (job, reattach) ->
-		if @jobs[job.name]
-			throw new Error "Job \"#{job.name}\" already exist!"
-			return job
-
-		@jobs[job.name] = job
-
-		if job.shared
-			if cluster.isMaster
-				unless @workers.length
-					if job.report
-						trace "[job] no workers for shared jobs"
-					
-				job._interval = setInterval () =>
-					if job.running and not job.multi then return
-					if @locked or job.locked or not job.enabled then return
-					
-					if @workers.length
-						worker = @workers.shift()
-						@employed[worker.id] = worker
-						@timers[worker.id] = new Date().getTime()
-						
-						if job.report
-							trace "[job] starting \"#{job.name}\" by worker #{worker.id}"
-
-						job.running = true
-						if job.locking then job.locked = true
-
-						worker.send
-							_node_scheduler:
-								action: 'trigger'
-								job: job.name
-					
-				, job.interval
-			
-		else
-			if not cluster.isWorker
-				job._interval = setInterval () =>
-					if job.running and not job.multi then return
-					if @locked or job.locked or not job.enabled then return
-					
-					if job.report
-						trace "[job] starting \"#{job.name}\""
-						
-					job.running = true
-					if job.locking then job.locked = true
-					
-					start = new Date().getTime()
-					job.action?.call job.context ? @, job, (err) =>
-						if job.report
-							trace "[job] \"#{job.name}\" completed in #{new Date().getTime() - start}ms"
-							
-						@_complete err, job
-					
-				, job.interval
-		
-		if job.report and not reattach
-			trace "[job] \"#{job.name}\" attached"
-		
-		job
-	
-	detach: (job) ->
-		unless @jobs[job.name]
-			return false
-	
-		if job.running
-			job.detachWhenPossible = true
-			return true
-	
-		delete @jobs[job.name]
-			
-		clearInterval job._interval
-		job._interval = null
-
-		if job.report
-			trace "[job] \"#{job.name}\" detached"
-
-		job
-		
-	_complete: (err, job) ->
-		job.running = false
-		job.locked = false
-		
-		if job.report and err
-			trace "[job] \"#{job.name}\" finshed with error: #{err}"
-		
-		if job.detachWhenPossible
-			delete job.detachWhenPossible
-			@detach job
-
-	_init: () ->
+	constructor: () ->
 		handler = (msg, worker) =>
 			if msg?._node_scheduler
 				job = @jobs[msg._node_scheduler.job]
 				
 				switch msg._node_scheduler.action
 					when 'complete'
-						if job.report
-							trace "[job] \"#{job.name}\" completed by worker #{worker.id} in #{new Date().getTime() - @timers[worker.id]}ms"
+						@_status "Job \"#{job.name}\" completed by worker #{worker.id} in #{new Date().getTime() - @timers[worker.id]}ms"
 
 						delete @timers[worker.id]
 						delete @employed[worker.id]
@@ -116,8 +24,7 @@ Scheduler =
 						@_complete msg._node_scheduler.error, job
 						
 					when 'unlock'
-						if job.report
-							trace "[job] \"#{job.name}\" unlocked by worker #{worker.id}"
+						@_status "Job \"#{job.name}\" unlocked by worker #{worker.id}"
 							
 						job.locked = false
 			
@@ -146,6 +53,89 @@ Scheduler =
 						when 'trigger'
 							@_trigger msg._node_scheduler.job
 	
+	attach: (job) ->
+		if @jobs[job.name]
+			@_error "Job \"#{job.name}\" already exist!"
+			return job
+
+		@jobs[job.name] = job
+
+		if job.shared
+			if cluster.isMaster
+				unless @workers.length
+					@_status "No workers for shared jobs"
+					
+				job._interval = setInterval () =>
+					if job.running and not job.multi then return
+					if @locked or job.locked or not job.enabled then return
+					
+					if @workers.length
+						worker = @workers.shift()
+						@employed[worker.id] = worker
+						@timers[worker.id] = new Date().getTime()
+						
+						@_status "Job starting \"#{job.name}\" by worker #{worker.id}"
+
+						job.running = true
+						if job.locking then job.locked = true
+
+						worker.send
+							_node_scheduler:
+								action: 'trigger'
+								job: job.name
+					
+				, job.interval
+			
+		else
+			if not cluster.isWorker
+				job._interval = setInterval () =>
+					if job.running and not job.multi then return
+					if @locked or job.locked or not job.enabled then return
+					
+					@_status "Starting job \"#{job.name}\""
+						
+					job.running = true
+					if job.locking then job.locked = true
+					
+					start = new Date().getTime()
+					job.action?.call job.context ? @, job, (err) =>
+						@_status "Job \"#{job.name}\" completed in #{new Date().getTime() - start}ms"
+						@_complete err, job
+					
+				, job.interval
+		
+		@_status "Job \"#{job.name}\" attached"
+		
+		job
+	
+	detach: (job) ->
+		unless @jobs[job.name]
+			return false
+	
+		if job.running
+			job.detachWhenPossible = true
+			return true
+	
+		delete @jobs[job.name]
+			
+		clearInterval job._interval
+		job._interval = null
+
+		@_status "Job \"#{job.name}\" detached"
+
+		job
+		
+	_complete: (err, job) ->
+		job.running = false
+		job.locked = false
+		
+		if err
+			@_error "Job \"#{job.name}\" finshed with error: #{err}"
+		
+		if job.detachWhenPossible
+			delete job.detachWhenPossible
+			@detach job
+
 	_trigger: (jobname) ->
 		job = @jobs[jobname]
 		
@@ -163,12 +153,15 @@ Scheduler =
 						action: 'complete'
 						job: job.name
 						error: err
+						
+	_status: (msg) ->
+		@emit 'status', msg
 		
-Scheduler._init()
-	
+	_error: (msg) ->
+		@emit 'error', msg
+		
 class Job
 	shared: false
-	report: false
 	multi: false
 	action: null
 	locking: false
@@ -179,11 +172,11 @@ class Job
 			@[i] = cfg[i]
 		
 	start: () ->
-		Scheduler.attach @
+		module.exports.Scheduler.attach @
 	
 	stop: () ->
-		Scheduler.detach @
-		
+		module.exports.Scheduler.detach @
+
 	lock: () ->
 		if @shared and cluster.isWorker
 			process.send
@@ -204,5 +197,5 @@ class Job
 		else
 			@locked = false
 			
-module.exports.Scheduler = Scheduler
+module.exports.Scheduler = new Scheduler
 module.exports.Job = Job

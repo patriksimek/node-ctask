@@ -10,11 +10,6 @@ var Job = require('ctask').Job;
 new Job({
     name: 'my-first-task',
     interval: 1000,
-    shared: false,
-    multi: false,
-    context: this,
-    locking: false,
-    report: true,
     action: function (job, callback) {
         // do something
         callback();
@@ -36,7 +31,6 @@ new Job({
 * multi - Can run multiple instances of tasks simultaneously?
 * context - Context of target function
 * locking - Described bellow
-* report - Verbose mode for debugging
 * action - The function that will be executed
 
 Number of concurrent tasks is always equal to number of spawned workers. You can spawn
@@ -51,8 +45,18 @@ It is sometimes nessesary to control execution of concurrent tasks. If you enabl
 no new concurrent task will be executed until you unlock it or the current one ends.
 
 ```javascript
-var Job = require('ctask').Job;
 var cluster = require('cluster');
+
+var Scheduler = require('ctask').Scheduler;
+var Job = require('ctask').Job;
+
+Scheduler.on('status', function (msg) {
+	console.log(msg);
+});
+
+Scheduler.on('error', function (msg) {
+	console.log(msg);
+});
 
 if (cluster.isMaster) {
     cluster.fork();
@@ -64,7 +68,10 @@ if (cluster.isMaster) {
 new Job({
     name: 'my-first-task',
     interval: 100,
-    locking: true,
+	shared: true,
+	multi: true,
+	context: this,
+	locking: true,
     action: function (job, callback) {
         setTimeout(function() {
             job.unlock();
@@ -86,6 +93,7 @@ worker will be released to perform a new task.
 job.start();
 job.stop();
 job.enabled = false;
+Scheduler.enabled = false;
 ```
 
 ## TODO
