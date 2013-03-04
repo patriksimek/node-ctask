@@ -1,7 +1,7 @@
 {
   "name": "ctask",
   "description": "Cluster task scheduler for nodejs",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "author": {
     "name": "Patrik Simek",
     "email": "patrik@patriksimek.cz"
@@ -21,6 +21,6 @@
   },
   "main": "lib/index.js",
   "engines": {
-    "node": "0.8.0"
+    "node": ">=0.8"
   }
 }
