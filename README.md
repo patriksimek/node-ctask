@@ -1,4 +1,4 @@
-# ctask
+# ctask [Project abandoned]
 
 Cluster task scheduler for nodejs
 
